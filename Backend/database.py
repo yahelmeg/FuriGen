@@ -1,6 +1,7 @@
 from sqlmodel import create_engine, SQLModel
 import os
 from dotenv import load_dotenv
+from models import Tag, Kana, Kanji, Sense, Entry
 
 load_dotenv()
 
@@ -15,7 +16,10 @@ engine = create_engine(postgres_url,echo=True)
 
 def create_db_and_tables():
     SQLModel.metadata.create_all(engine)
-    print("Tables created successfully!")
 
-
-
+def delete_all_databases():
+    try:
+        SQLModel.metadata.drop_all(engine)
+        print("All tables have been deleted successfully.")
+    except Exception as e:
+        print(f"Error while deleting tables: {e}")

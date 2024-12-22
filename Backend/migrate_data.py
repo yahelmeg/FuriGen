@@ -1,5 +1,5 @@
 import json
-from models import Kanji, Kana, Sense, Tag, KanjiTagLink, Entry
+from models import Kanji, Kana, Sense, Tag, KanjiTagLink, Entry, KanaTagLink, KanjiKanaLink
 from sqlmodel import create_engine, SQLModel, Session, select
 import os
 from dotenv import load_dotenv
@@ -35,11 +35,11 @@ def create_tags():
         session.commit()
         pbar.close()
 
-def create_kanji():
+def create_entries():
     commit_counter = 0
     session = Session(engine)
     total_entries = len(jmdict_data['words'])
-    with tqdm(total= total_entries, desc="Processing Kanji", unit=" Kanji") as pbar:
+    with tqdm(total= total_entries, desc="Processing Entries", unit=" Entry") as pbar:
         for entry in jmdict_data['words']:
             entry_id = entry['id']
             entry_statement = select(Entry).where(Entry.entry_id == entry_id)
@@ -58,19 +58,47 @@ def create_kanji():
                 session.add(new_kanji)
                 session.flush()
                 for tag_name in kanji_tags:
-                    kanji_statement = select(Tag).where(Tag.name == tag_name)
-                    tag_res = session.exec(kanji_statement).first()  # type: ignore
+                    search_tag_statement = select(Tag).where(Tag.name == tag_name)
+                    tag_res = session.exec(search_tag_statement).first()  # type: ignore
                     if tag_res:
                         new_kanji_tag_link = KanjiTagLink(kanji_id = new_kanji.id, tag_id = tag_res.id)
                         session.add(new_kanji_tag_link)
+
+                for kana in entry['kana']:
+                    kana_text = kana['text']
+                    kana_common = kana['common']
+                    kana_tags = kana['tags']
+                    application_to_kanji = kana['appliesToKanji']
+                    new_kana = Kana(text=kana_text, common=kana_common, entry_id=existing_entry.id)
+                    session.add(new_kana)
+                    session.flush()
+                    for tag_name in kana_tags:
+                        search_tag_statement = select(Tag).where(Tag.name == tag_name)
+                        tag_res = session.exec(search_tag_statement).first()  # type: ignore
+                        if tag_res:
+                            new_kana_tag_link = KanaTagLink(kana_id=new_kana.id, tag_id=tag_res.id)
+                            session.add(new_kana_tag_link)
+                    if "*" in application_to_kanji:
+                        kanji_statement = select(Kanji).where(Kanji.entry_id == existing_entry.id)
+                        kanji_results = session.exec(kanji_statement).all() # type: ignore
+                        for kanji_res in kanji_results:
+                            new_kanji_kana_link = KanjiKanaLink(kanji_id = kanji_res.id, kana_id = new_kana.id)
+                            session.add(new_kanji_kana_link)
+                    else:
+                        for application in application_to_kanji:
+                            kanji_statement = select(Kanji).where(Kanji.text == application and kanji.entry_id == existing_entry.id)
+                            kanji_res = session.exec(kanji_statement).first() # type: ignore
+                            if kanji_res:
+                                new_kanji_kana_link = KanjiKanaLink(kanji_id=kanji_res.id, kana_id=new_kana.id)
+                                session.add(new_kanji_kana_link)
+
 
             commit_counter += 1
             pbar.update(1)
             if commit_counter % 100 == 0: # commit every 100 entries
                 session.commit()
-
         session.commit()
         pbar.close()
 
 create_tags()
-create_kanji()
+create_entries()

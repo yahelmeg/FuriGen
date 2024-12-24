@@ -1,7 +1,7 @@
 from sqlmodel import create_engine, SQLModel
 import os
 from dotenv import load_dotenv
-from models import Tag, Kana, Kanji, Sense, Entry
+from models import *
 
 load_dotenv()
 

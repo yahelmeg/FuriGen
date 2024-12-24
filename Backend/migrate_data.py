@@ -1,5 +1,5 @@
 import json
-from models import Kanji, Kana, Sense, Tag, KanjiTagLink, Entry, KanaTagLink, KanjiKanaLink
+from models import *
 from sqlmodel import create_engine, SQLModel, Session, select
 import os
 from dotenv import load_dotenv
@@ -50,12 +50,15 @@ def create_entries():
                 session.flush()
                 existing_entry = new_entry
 
+            #process kanji
+            kanji_list = []
             for kanji in entry['kanji']:
                 kanji_text= kanji['text']
                 kanji_common = kanji['common']
                 kanji_tags = kanji['tags']
                 new_kanji = Kanji(text=kanji_text, common=kanji_common, entry_id=existing_entry.id)
                 session.add(new_kanji)
+                kanji_list.append(new_kanji)
                 session.flush()
                 for tag_name in kanji_tags:
                     search_tag_statement = select(Tag).where(Tag.name == tag_name)
@@ -64,34 +67,65 @@ def create_entries():
                         new_kanji_tag_link = KanjiTagLink(kanji_id = new_kanji.id, tag_id = tag_res.id)
                         session.add(new_kanji_tag_link)
 
-                for kana in entry['kana']:
-                    kana_text = kana['text']
-                    kana_common = kana['common']
-                    kana_tags = kana['tags']
-                    application_to_kanji = kana['appliesToKanji']
-                    new_kana = Kana(text=kana_text, common=kana_common, entry_id=existing_entry.id)
-                    session.add(new_kana)
-                    session.flush()
-                    for tag_name in kana_tags:
-                        search_tag_statement = select(Tag).where(Tag.name == tag_name)
-                        tag_res = session.exec(search_tag_statement).first()  # type: ignore
-                        if tag_res:
-                            new_kana_tag_link = KanaTagLink(kana_id=new_kana.id, tag_id=tag_res.id)
-                            session.add(new_kana_tag_link)
-                    if "*" in application_to_kanji:
-                        kanji_statement = select(Kanji).where(Kanji.entry_id == existing_entry.id)
-                        kanji_results = session.exec(kanji_statement).all() # type: ignore
-                        for kanji_res in kanji_results:
-                            new_kanji_kana_link = KanjiKanaLink(kanji_id = kanji_res.id, kana_id = new_kana.id)
-                            session.add(new_kanji_kana_link)
-                    else:
-                        for application in application_to_kanji:
-                            kanji_statement = select(Kanji).where(Kanji.text == application and kanji.entry_id == existing_entry.id)
-                            kanji_res = session.exec(kanji_statement).first() # type: ignore
-                            if kanji_res:
-                                new_kanji_kana_link = KanjiKanaLink(kanji_id=kanji_res.id, kana_id=new_kana.id)
-                                session.add(new_kanji_kana_link)
+            #process kana
+            kana_list = []
+            for kana in entry['kana']:
+                kana_text = kana['text']
+                kana_common = kana['common']
+                kana_tags = kana['tags']
+                new_kana = Kana(text=kana_text, common=kana_common, entry_id=existing_entry.id)
+                session.add(new_kana)
+                kana_list.append(new_kana)
+                session.flush()
+                for tag_name in kana_tags:
+                    search_tag_statement = select(Tag).where(Tag.name == tag_name)
+                    tag_res = session.exec(search_tag_statement).first()  # type: ignore
+                    if tag_res:
+                        new_kana_tag_link = KanaTagLink(kana_id=new_kana.id, tag_id=tag_res.id)
+                        session.add(new_kana_tag_link)
 
+            #process sense
+            for sense in entry['sense']:
+                sense_tags = sense['partOfSpeech']
+                related = sense['related']
+                antonym = sense['antonym']
+                field = sense['field']
+                dialect = sense['dialect']
+                misc = sense['misc']
+                info = sense['info']
+                language_source = ", ".join(sense['languageSource'])
+                new_sense = Sense(tag=sense_tags, related=related, antonym=antonym, field=field,
+                                  dialect=dialect, misc=misc, info=info,
+                                  language_source=language_source,  entry_id=existing_entry.id )
+                session.add(new_sense)
+                session.flush()
+                for tag_name in sense_tags:
+                    search_tag_statement = select(Tag).where(Tag.name == tag_name)
+                    tag_res = session.exec(search_tag_statement).first()  # type: ignore
+                    if tag_res:
+                        new_sense_tag_link = SenseTagLink(sense_id=new_sense.id, tag_id=tag_res.id)
+                        session.add(new_sense_tag_link)
+
+                #process gloss
+                for gloss in sense['gloss']:
+                    gloss_text = gloss['text']
+                    gloss_type = gloss['type']
+                    gloss_gender = gloss['gender']
+                    gloss_lang = gloss['lang']
+                    new_gloss = Gloss(lang=gloss_lang, gender=gloss_gender,
+                                      type=gloss_type, text=gloss_text, sense_id= sense.id)
+                    session.add(new_gloss)
+                    session.flush()
+
+                #process example
+                for example in sense['example']:
+                    example_text = example['text']
+                    example_sentence = example['sentences'][0].get('text', '')
+                    example_translation = example['sentences'][1].get('text', '')
+                    new_example = Example(text=example_text, sentence= example_sentence,
+                                          translation = example_translation, sense_id= sense.id)
+                    session.add(new_example)
+                    session.flush()
 
             commit_counter += 1
             pbar.update(1)
@@ -102,3 +136,4 @@ def create_entries():
 
 create_tags()
 create_entries()
+

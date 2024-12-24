@@ -29,7 +29,7 @@ class Tag(SQLModel, table=True):
     definition: str
     kanji: List["Kanji"] = Relationship(back_populates="tags", link_model=KanjiTagLink)
     kana: List["Kana"] = Relationship(back_populates="tags", link_model=KanaTagLink)
-    sense: List["Sense"] = Relationship(back_populates="part_of_speech", link_model=SenseTagLink)
+    sense: List["Sense"] = Relationship(back_populates="tags", link_model=SenseTagLink)
 
 
 class Kanji(SQLModel, table=True):
@@ -56,7 +56,7 @@ class Kana(SQLModel, table=True):
 
 class Sense(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    part_of_speech: List[Tag] = Relationship(back_populates="sense", link_model=SenseTagLink)
+    tags: List[Tag] = Relationship(back_populates="sense", link_model=SenseTagLink)
     related: Optional[str]
     antonym: Optional[str]
     field: Optional[str]
@@ -74,8 +74,9 @@ class Sense(SQLModel, table=True):
 
 class Example(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    text: str
-    translation: str
+    text: Optional[str]
+    sentence: Optional[str]
+    translation: Optional[str]
     sense_id: Optional[int] = Field(foreign_key="sense.id", index=True)
     sense: Optional[Sense] = Relationship(back_populates="examples")
 

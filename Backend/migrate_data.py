@@ -1,6 +1,6 @@
 import json
 from models import *
-from sqlmodel import create_engine, SQLModel, Session, select
+from sqlmodel import create_engine, Session, select
 import os
 from dotenv import load_dotenv
 from tqdm import tqdm
@@ -66,6 +66,7 @@ def create_entries():
                     if tag_res:
                         new_kanji_tag_link = KanjiTagLink(kanji_id = new_kanji.id, tag_id = tag_res.id)
                         session.add(new_kanji_tag_link)
+            kanji_dict = {kanji.text: kanji for kanji in kanji_list}
 
             #process kana
             kana_list = []
@@ -73,6 +74,7 @@ def create_entries():
                 kana_text = kana['text']
                 kana_common = kana['common']
                 kana_tags = kana['tags']
+                kana_application_to_kanji = kana['appliesToKanji']
                 new_kana = Kana(text=kana_text, common=kana_common, entry_id=existing_entry.id)
                 session.add(new_kana)
                 kana_list.append(new_kana)
@@ -84,19 +86,24 @@ def create_entries():
                         new_kana_tag_link = KanaTagLink(kana_id=new_kana.id, tag_id=tag_res.id)
                         session.add(new_kana_tag_link)
 
+                if "*" in kana_application_to_kanji:
+                    for kanji_res in kanji_list:
+                        new_kanji_kana_link = KanjiKanaLink(kanji_id=kanji_res.id, kana_id=new_kana.id)
+                        session.add(new_kanji_kana_link)
+                else:
+                    for application in kana_application_to_kanji:
+                        kanji_res = kanji_dict.get(application)
+                        if kanji_res:
+                            new_kanji_kana_link = KanjiKanaLink(kanji_id=kanji_res.id, kana_id=new_kana.id)
+                            session.add(new_kanji_kana_link)
+            kana_dict = {kana.text: kana for kana in kana_list}
+
             #process sense
             for sense in entry['sense']:
                 sense_tags = sense['partOfSpeech']
-                related = sense['related']
-                antonym = sense['antonym']
-                field = sense['field']
-                dialect = sense['dialect']
-                misc = sense['misc']
-                info = sense['info']
-                language_source = ", ".join(sense['languageSource'])
-                new_sense = Sense(tag=sense_tags, related=related, antonym=antonym, field=field,
-                                  dialect=dialect, misc=misc, info=info,
-                                  language_source=language_source,  entry_id=existing_entry.id )
+                sense_application_to_kanji = sense['appliesToKanji']
+                sense_application_to_kana = sense['appliesToKana']
+                new_sense = Sense(tag=sense_tags, entry_id=existing_entry.id )
                 session.add(new_sense)
                 session.flush()
                 for tag_name in sense_tags:
@@ -106,6 +113,28 @@ def create_entries():
                         new_sense_tag_link = SenseTagLink(sense_id=new_sense.id, tag_id=tag_res.id)
                         session.add(new_sense_tag_link)
 
+                if "*" in sense_application_to_kanji:
+                    for kanji_res in kanji_list:
+                        new_kanji_sense_link = KanjiSenseLink(kanji_id=kanji_res.id, sense_id=new_sense.id)
+                        session.add(new_kanji_sense_link)
+                else:
+                    for application in sense_application_to_kanji:
+                        kanji_res = kanji_dict.get(application)
+                        if kanji_res:
+                            new_kanji_sense_link = KanjiSenseLink(kanji_id=kanji_res.id, sense_id=new_sense.id)
+                            session.add(new_kanji_sense_link)
+
+                if "*" in sense_application_to_kana:
+                    for kana_res in kana_list:
+                        new_kana_sense_link = KanaSenseLink(kana_id=kana_res.id, sense_id=new_sense.id)
+                        session.add(new_kana_sense_link)
+                else:
+                    for application in sense_application_to_kana:
+                        kana_res = kana_dict.get(application)
+                        if kana_res:
+                            new_kana_sense_link = KanaSenseLink(kana_id=kana_res.id, sense_id=new_sense.id)
+                            session.add(new_kana_sense_link)
+
                 #process gloss
                 for gloss in sense['gloss']:
                     gloss_text = gloss['text']
@@ -113,17 +142,17 @@ def create_entries():
                     gloss_gender = gloss['gender']
                     gloss_lang = gloss['lang']
                     new_gloss = Gloss(lang=gloss_lang, gender=gloss_gender,
-                                      type=gloss_type, text=gloss_text, sense_id= sense.id)
+                                      type=gloss_type, text=gloss_text, sense_id= new_sense.id)
                     session.add(new_gloss)
                     session.flush()
 
                 #process example
-                for example in sense['example']:
+                for example in sense['examples']:
                     example_text = example['text']
                     example_sentence = example['sentences'][0].get('text', '')
                     example_translation = example['sentences'][1].get('text', '')
                     new_example = Example(text=example_text, sentence= example_sentence,
-                                          translation = example_translation, sense_id= sense.id)
+                                          translation = example_translation, sense_id= new_sense.id)
                     session.add(new_example)
                     session.flush()
 
@@ -134,6 +163,54 @@ def create_entries():
         session.commit()
         pbar.close()
 
-create_tags()
-create_entries()
+# create_tags()
+# create_entries()
+
+def check_links_kana_kanji():
+    total_links = 0
+    for entry in jmdict_data['words']:
+        kanji_list = entry['kanji']  # Use kanji from the current entry
+        for kana in entry['kana']:
+            application_to_kanji = kana['appliesToKanji']
+
+            if "*" in application_to_kanji:
+                total_links += len(kanji_list)  # Links to all kanji in this entry
+            else:
+                total_links += len(application_to_kanji)  # Links to specific kanji
+
+    print(f"Estimated total KanjiKanaLink entries: {total_links}")
+
+def check_links_kanji_sense():
+    total_links = 0
+    for entry in jmdict_data['words']:
+        kanji_list = entry['kanji']  # Use kanji from the current entry
+        for sense in entry['sense']:
+            application_to_kanji = sense['appliesToKanji']
+
+            if "*" in application_to_kanji:
+                total_links += len(kanji_list)  # Links to all kanji in this entry
+            else:
+                total_links += len(application_to_kanji)  # Links to specific kanji
+
+    print(f"Estimated total KanjiSenseLink entries: {total_links}")
+
+
+def check_links_kana_sense():
+    total_links = 0
+    for entry in jmdict_data['words']:
+        kana_list = entry['kana']  # Use kanji from the current entry
+        for sense in entry['sense']:
+            application_to_kana = sense['appliesToKana']
+
+            if "*" in application_to_kana:
+                total_links += len(kana_list)  # Links to all kanji in this entry
+            else:
+                total_links += len(application_to_kana)  # Links to specific kanji
+
+    print(f"Estimated total KanaSenseLink entries: {total_links}")
+
+
+# check_links_kana_kanji()
+# check_links_kanji_sense()
+# check_links_kana_sense()
 

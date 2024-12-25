@@ -1,8 +1,15 @@
 from fastapi import FastAPI
+from Backend.Kanji.kanji import router as kanji_router
+from Backend.Kana.kana import router as kana_router
 import uvicorn
 import os
+import dotenv
 
 app = FastAPI()
+dotenv.load_dotenv()
+
+for router in [kana_router, kanji_router]:
+    app.include_router(router)
 
 @app.get("/")
 def root():

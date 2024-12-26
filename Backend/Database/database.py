@@ -2,6 +2,8 @@ from sqlmodel import create_engine
 import os
 from dotenv import load_dotenv
 from Backend.Database.entities import *
+from Backend.User.user_model import User
+
 load_dotenv()
 
 postgres_user = os.getenv("POSTGRES_USER")
@@ -18,7 +20,11 @@ def create_db_and_tables():
 
 def delete_all_databases():
     try:
-        SQLModel.metadata.drop_all(engine)
-        print("All tables have been deleted successfully.")
+        confirmation = input("WARNING: This will delete all tables in the database. Are you sure? (yes/no): ").strip().lower()
+        if confirmation == "yes":
+            SQLModel.metadata.drop_all(engine)
+            print("All tables have been deleted successfully.")
+        else:
+            print("Operation canceled. No tables were deleted.")
     except Exception as e:
         print(f"Error while deleting tables: {e}")

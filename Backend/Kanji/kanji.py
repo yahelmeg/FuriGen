@@ -1,31 +1,11 @@
-from typing import Optional
 from sqlalchemy.orm import Session
 from Backend.Database.database import engine
 from Backend.Database.entities import Kanji, Kana, Sense, Example, Gloss, Tag, KanjiKanaLink, KanjiSenseLink, SenseTagLink
+from .kanji_response_models import *
 from sqlmodel import select
 from fastapi import APIRouter
-from pydantic import BaseModel
 
 router = APIRouter(prefix="/kanji")
-
-class KanaResponse(BaseModel):
-    text: str
-    common: bool
-
-class ExampleResponse(BaseModel):
-    text: str
-    sentence: str
-    translation: str
-
-class GlossResponse(BaseModel):
-    lang: Optional[str]
-    gender: Optional[str]
-    type: Optional[str]
-    text: str
-
-class TagResponse(BaseModel):
-    name: str
-    definition: str
 
 @router.get("/kana", response_model=list[KanaResponse])
 def get_kana_for_kanji(kanji: str):

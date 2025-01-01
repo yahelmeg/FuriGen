@@ -1,14 +1,13 @@
 from fastapi import FastAPI
 from Backend.Kanji.kanji import router as kanji_router
 from Backend.Kana.kana import router as kana_router
-from Database.database import create_db_and_tables
 import uvicorn
 import os
 import dotenv
 
 app = FastAPI()
 dotenv.load_dotenv()
-create_db_and_tables()
+
 
 for router in [kana_router, kanji_router]:
     app.include_router(router)
@@ -16,6 +15,8 @@ for router in [kana_router, kanji_router]:
 @app.get("/")
 def root():
     return {"Message": "FuriGen API"}
+
+
 
 if __name__ == "__main__":
     uvicorn.run(app, host=os.getenv('BACK_DOMAIN'), port=int(os.getenv('BACK_PORT')))

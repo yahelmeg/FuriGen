@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from Backend.Database.database import engine
 from Backend.Database.entities import Kanji, Kana, Sense, Example, Gloss, Tag, KanjiKanaLink, KanjiSenseLink, SenseTagLink
-from .kanji_response_models import *
+from kanji_response_models import *
 from sqlmodel import select
 from fastapi import APIRouter
 

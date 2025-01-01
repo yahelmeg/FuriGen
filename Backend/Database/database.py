@@ -1,7 +1,6 @@
-from sqlmodel import create_engine
+from sqlmodel import create_engine, SQLModel
 import os
 from dotenv import load_dotenv
-from Backend.Database.entities import *
 from Backend.User.user_model import User
 
 load_dotenv()
@@ -15,10 +14,10 @@ postgres_url = f"postgresql://{postgres_user}:{postgres_password}@{postgres_host
 
 engine = create_engine(postgres_url)
 
-def create_db_and_tables():
+def create_tables():
     SQLModel.metadata.create_all(engine)
 
-def delete_all_databases():
+def delete_database():
     try:
         confirmation = input("WARNING: This will delete all tables in the database. Are you sure? (yes/no): ").strip().lower()
         if confirmation == "yes":

@@ -1,30 +1,21 @@
-from Backend.User.user_model import User
-from sqlalchemy.orm import Session
-from Backend.Database.database import  engine
-from sqlmodel import select
-from fastapi import FastAPI
-from fastapi.security import OAuth2PasswordBearer
-from passlib.context import CryptContext
+from fastapi import APIRouter
+from fastapi.security import OAuth2PasswordRequestForm
+from .auth_utils import *
+from .auth_models import Token
+import os
 
+router = APIRouter()
 
-app = FastAPI()
-
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-def verify_password(password: str, hashed_password: str):
-    pwd_context.verify(password, hashed_password)
-
-def get_password_hash(password: str):
-    pwd_context.hash(password)
-
-def authenticate_user(username: str,password: str):
-    session = Session(engine)
-    statement = select(User).where(User.id == username)
-    user = session.execute(statement).scalars().first()
-    if not user or not verify_password(password,user.hashed_password):
-        return None
-    return user
-
+@router.post("/token")
+def login_for_access_token(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]) -> Token:
+    user= authenticate_user(form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    access_token_expiration_time = timedelta(minutes=int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES")))
+    access_token = create_access_token( data={"sub": user.username}, expires_delta=access_token_expiration_time)
+    return Token(access_token=access_token, token_type="bearer")
 
